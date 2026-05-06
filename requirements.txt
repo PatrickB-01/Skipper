@@ -1,0 +1,15 @@
+librosa==0.10.2
+mss==9.0.1
+numpy==1.26.4
+open-clip-torch==2.26.1
+Pillow==10.4.0
+pynput==1.7.6
+scikit-learn==1.4.2
+sounddevice==0.4.7
+torch==2.3.1
+torchvision==0.18.1
+joblib==1.4.2
+
+# Optional (ASR/OCR)
+faster-whisper==1.1.0
+pytesseract==0.3.10

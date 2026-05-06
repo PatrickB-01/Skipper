@@ -70,7 +70,7 @@ class INPUT(ctypes.Structure):
 	_fields_ = [("type", ctypes.c_ulong), ("union", INPUTUNION)]
 
 
-def _send_right_arrow() -> None:
+def send_right_arrow() -> None:
 	"""Send a Right Arrow key down + up event using Win32 SendInput."""
 	extra = ctypes.c_ulong(0)
 
@@ -194,7 +194,7 @@ def main() -> None:
 		was_toggle_down = toggle_down
 
 		if not paused and now >= next_skip_time:
-			_send_right_arrow()
+			send_right_arrow()
 			next_skip_time = now + args.seconds
 
 		# Small sleep keeps CPU usage low while still feeling responsive.
