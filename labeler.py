@@ -12,10 +12,10 @@ from pynput import keyboard
 
 
 LABEL_MAP = {
-    "1": "intro",
-    "2": "recap",
-    "3": "outro",
-    "4": "idle",
+    "Q": "intro",
+    "W": "recap",
+    "E": "outro",
+    "R": "idle",
 }
 
 
@@ -23,8 +23,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Label skip segments using hotkeys.")
     parser.add_argument("--session-dir", type=str, required=True, help="Session folder.")
     parser.add_argument("--label-file", type=str, default=None, help="Output labels CSV file.")
-    parser.add_argument("--toggle-key", type=str, default="F9", help="Toggle segment start/end.")
-    parser.add_argument("--quit-key", type=str, default="F10", help="Quit labeling.")
+    parser.add_argument("--toggle-key", type=str, default="O", help="Toggle segment start/end.")
+    parser.add_argument("--quit-key", type=str, default="P", help="Quit labeling.")
     return parser.parse_args()
 
 
@@ -53,7 +53,7 @@ def main() -> None:
     segment_start = None
 
     print("Hotkeys:")
-    print("  1-4: set label (1=intro, 2=recap, 3=outro, 4=idle)")
+    print("  Q-W-E-R: set label (Q=intro, W=recap, E=outro, R=idle)")
     print(f"  {args.toggle_key}: toggle segment start/end")
     print(f"  {args.quit_key}: quit")
     print("Tip: you can press the label key after starting a segment.")
