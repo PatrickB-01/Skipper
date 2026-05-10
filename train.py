@@ -16,8 +16,20 @@ from sklearn.model_selection import train_test_split
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a RandomForest skip classifier.")
-    parser.add_argument("--features", type=str, required=True, help="Features CSV path.")
-    parser.add_argument("--labels", type=str, required=True, help="Labels CSV path.")
+    parser.add_argument(
+        "--features",
+        type=str,
+        nargs="+",
+        required=True,
+        help="One or more features CSV paths.",
+    )
+    parser.add_argument(
+        "--labels",
+        type=str,
+        nargs="+",
+        required=True,
+        help="One or more labels CSV paths (same count/order as --features).",
+    )
     parser.add_argument(
         "--positive-labels",
         type=str,
@@ -47,25 +59,48 @@ def _label_window(timestamp: float, labels: list[dict[str, str]], positive: set[
 
 def main() -> None:
     args = _parse_args()
-    feature_path = Path(args.features)
-    label_path = Path(args.labels)
+    if len(args.features) != len(args.labels):
+        raise ValueError("--features and --labels must have the same number of paths.")
 
     positive = {name.strip().lower() for name in args.positive_labels.split(",") if name.strip()}
-    labels = _load_labels(label_path)
 
-    with feature_path.open("r", newline="") as feature_file:
-        reader = csv.DictReader(feature_file)
-        rows = list(reader)
+    all_rows: list[dict[str, str]] = []
+    all_labels: list[list[dict[str, str]]] = []
+    feature_columns: list[str] | None = None
 
-    if not rows:
+    for features_path, labels_path in zip(args.features, args.labels, strict=False):
+        labels = _load_labels(Path(labels_path))
+        with Path(features_path).open("r", newline="") as feature_file:
+            reader = csv.DictReader(feature_file)
+            session_rows = list(reader)
+
+        if not session_rows:
+            raise ValueError(f"No feature rows found in {features_path}.")
+
+        current_columns = [
+            col for col in session_rows[0].keys() if col not in {"window_id", "timestamp"}
+        ]
+        if feature_columns is None:
+            feature_columns = current_columns
+        elif current_columns != feature_columns:
+            raise ValueError(
+                "Feature columns differ across sessions. Ensure the same feature pipeline is used."
+            )
+
+        all_rows.extend(session_rows)
+        all_labels.extend([labels] * len(session_rows))
+
+    if not all_rows or feature_columns is None:
         raise ValueError("No feature rows found.")
 
-    feature_columns = [col for col in rows[0].keys() if col not in {"window_id", "timestamp"}]
-
-    X = np.array([[float(row[col]) for col in feature_columns] for row in rows], dtype=np.float32)
-    y = np.array([
-        _label_window(float(row["timestamp"]), labels, positive) for row in rows
-    ], dtype=np.int32)
+    X = np.array([[float(row[col]) for col in feature_columns] for row in all_rows], dtype=np.float32)
+    y = np.array(
+        [
+            _label_window(float(row["timestamp"]), labels, positive)
+            for row, labels in zip(all_rows, all_labels, strict=False)
+        ],
+        dtype=np.int32,
+    )
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y if y.sum() > 0 else None
