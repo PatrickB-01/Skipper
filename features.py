@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
+
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 import librosa
 import numpy as np
@@ -75,6 +78,7 @@ def extract_clip_features(image: Image.Image, model, preprocess, device: str) ->
 
 
 _ASR_MODEL = None
+_ASR_DOWNLOAD_ROOT = None
 
 def run_asr(audio: np.ndarray, sample_rate: int) -> str:
     from faster_whisper import WhisperModel
@@ -82,7 +86,12 @@ def run_asr(audio: np.ndarray, sample_rate: int) -> str:
     global _ASR_MODEL
     if _ASR_MODEL is None:
         # "base" balances speed and accuracy; change to "tiny"/"small" as needed.
-        _ASR_MODEL = WhisperModel("base", device="cpu", compute_type="int8")
+        _ASR_MODEL = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8",
+            download_root=_ASR_DOWNLOAD_ROOT,
+        )
 
     if audio.ndim > 1:
         audio = audio.mean(axis=1)
@@ -106,11 +115,32 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--use-asr", action="store_true", help="Enable Whisper transcript keywords.")
     parser.add_argument("--use-ocr", action="store_true", help="Enable OCR text keywords.")
     parser.add_argument("--device", type=str, default="cpu", help="torch device for CLIP.")
+    parser.add_argument(
+        "--model-cache-dir",
+        type=str,
+        default=None,
+        help="Directory to store downloaded model caches (CLIP/ASR).",
+    )
     return parser.parse_args()
+
+
+def _apply_model_cache_dir(cache_dir: str | None) -> None:
+    if not cache_dir:
+        return
+
+    os.makedirs(cache_dir, exist_ok=True)
+    os.environ["TORCH_HOME"] = cache_dir
+    os.environ["HF_HOME"] = cache_dir
+    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_dir
+    os.environ["TRANSFORMERS_CACHE"] = cache_dir
 
 
 def main() -> None:
     args = _parse_args()
+
+    _apply_model_cache_dir(args.model_cache_dir)
+    global _ASR_DOWNLOAD_ROOT
+    _ASR_DOWNLOAD_ROOT = args.model_cache_dir
     session_dir = Path(args.session_dir)
     manifest_path = session_dir / "manifest.csv"
     if not manifest_path.exists():
