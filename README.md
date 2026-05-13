@@ -11,7 +11,7 @@ This project captures screen frames and system audio, extracts multimodal featur
 1) Create a capture session
 
 ```bash
-python capture.py --session-dir data/session_001 --window-seconds 5 --hop-seconds 1 --audio-backend soundcard
+python capture.py --session-dir data/session_001 --window-seconds 5 --hop-seconds 1 --audio-backend soundcard --jpeg-quality 80
 ```
 
 2) Label segments while the session is running
@@ -24,6 +24,12 @@ python labeler.py --session-dir data/session_001
 
 ```bash
 python features.py --session-dir data/session_001 --use-clip --use-asr --use-ocr
+```
+
+GPU (if available) for CLIP + ASR:
+
+```bash
+python features.py --session-dir data/session_001 --use-clip --use-asr --use-ocr --device cuda --asr-device auto --asr-compute-type auto
 ```
 
 4) Train the model
@@ -44,15 +50,20 @@ python train.py --features data/session_001/features.csv data/session_002/featur
 python infer.py --model model.joblib --features features.json --use-clip --use-asr --use-ocr --audio-backend soundcard --dry-run
 ```
 
+GPU (if available) for CLIP + ASR:
+
+```bash
+python infer.py --model model.joblib --features features.json --use-clip --use-asr --use-ocr --audio-backend soundcard --device cuda --asr-device auto --asr-compute-type auto
+```
+
 Remove `--dry-run` to enable actual skipping.
 
 ## Labeling Hotkeys
 
-- `Q` = intro
-- `W` = recap
-- `E` = outro
-- `R` = idle (optional)
-- `O` = toggle segment start/end
+- `Q` = toggle intro segment on/off
+- `W` = toggle recap segment on/off
+- `E` = toggle outro segment on/off
+- `R` = toggle idle segment on/off (optional)
 - `P` = quit
 
 ## Notes and Options
@@ -61,6 +72,9 @@ Remove `--dry-run` to enable actual skipping.
 - If you prefer `sounddevice`, use `--audio-backend sounddevice` with `--loopback`.
 - If ASR or OCR are not installed, skip `--use-asr` or `--use-ocr`.
 - You can pass `--device "Headphones"` (partial match) to pick a specific output.
+- Use `--jpeg-quality` to control frame size (default: 80).
+- Model caches default to `./model_cache`. Use `--model-cache-dir` to override.
+- For ASR GPU control, use `--asr-device` (auto/cpu/cuda) and `--asr-compute-type` (auto/int8/float16/float32).
 - RandomForest models are retrained from scratch when you add new sessions.
 - If you want to avoid CLIP embeddings, omit `--use-clip` (features will be audio + text only).
 - For talk-heavy or idle segments, label them consistently to avoid confusing the model.
