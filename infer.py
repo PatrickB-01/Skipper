@@ -14,7 +14,15 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import numpy as np
 
 from capture import AudioRingBuffer
-from features import extract_audio_features, load_clip_model, extract_clip_features, run_asr, run_ocr, _keyword_features
+from features import (
+    extract_audio_features,
+    load_clip_model,
+    extract_clip_features,
+    run_asr,
+    run_ocr,
+    _keyword_features,
+    set_asr_runtime,
+)
 from skipper import send_right_arrow
 
 import mss
@@ -48,9 +56,21 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--torch-device", type=str, default="cpu", help="torch device for CLIP.")
     parser.add_argument("--dry-run", action="store_true", help="Do not press skip key.")
     parser.add_argument(
+        "--asr-device",
+        type=str,
+        default="auto",
+        help="ASR device: auto, cpu, or cuda.",
+    )
+    parser.add_argument(
+        "--asr-compute-type",
+        type=str,
+        default="auto",
+        help="ASR compute type: auto, int8, float16, or float32.",
+    )
+    parser.add_argument(
         "--model-cache-dir",
         type=str,
-        default=None,
+        default="model_cache",
         help="Directory to store downloaded model caches (CLIP/ASR).",
     )
     return parser.parse_args()
@@ -60,11 +80,30 @@ def _apply_model_cache_dir(cache_dir: str | None) -> None:
     if not cache_dir:
         return
 
-    os.makedirs(cache_dir, exist_ok=True)
-    os.environ["TORCH_HOME"] = cache_dir
-    os.environ["HF_HOME"] = cache_dir
-    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_dir
-    os.environ["TRANSFORMERS_CACHE"] = cache_dir
+    cache_path = Path(cache_dir).expanduser().resolve()
+    os.makedirs(cache_path, exist_ok=True)
+    cache_value = str(cache_path)
+    os.environ["TORCH_HOME"] = cache_value
+    os.environ["HF_HOME"] = cache_value
+    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_value
+    os.environ["TRANSFORMERS_CACHE"] = cache_value
+
+
+def _resolve_asr_runtime(device: str, compute_type: str) -> None:
+    resolved_device = device
+    if device == "auto":
+        try:
+            import torch
+
+            resolved_device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            resolved_device = "cpu"
+
+    resolved_compute = compute_type
+    if compute_type == "auto":
+        resolved_compute = "float16" if resolved_device == "cuda" else "int8"
+
+    set_asr_runtime(resolved_device, resolved_compute)
 
 
 def _audio_callback(buffer: AudioRingBuffer, indata: np.ndarray, _frames: int, _time, _status) -> None:
@@ -190,6 +229,7 @@ def main() -> None:
     args = _parse_args()
 
     _apply_model_cache_dir(args.model_cache_dir)
+    _resolve_asr_runtime(args.asr_device, args.asr_compute_type)
 
     import joblib
 
