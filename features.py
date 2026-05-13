@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "TRUE")
 
 import librosa
 import numpy as np
@@ -79,6 +80,8 @@ def extract_clip_features(image: Image.Image, model, preprocess, device: str) ->
 
 _ASR_MODEL = None
 _ASR_DOWNLOAD_ROOT = None
+_ASR_DEVICE = "cpu"
+_ASR_COMPUTE_TYPE = "int8"
 
 def run_asr(audio: np.ndarray, sample_rate: int) -> str:
     from faster_whisper import WhisperModel
@@ -87,9 +90,9 @@ def run_asr(audio: np.ndarray, sample_rate: int) -> str:
     if _ASR_MODEL is None:
         # "base" balances speed and accuracy; change to "tiny"/"small" as needed.
         _ASR_MODEL = WhisperModel(
-            "base",
-            device="cpu",
-            compute_type="int8",
+            "tiny",
+            device=_ASR_DEVICE,
+            compute_type=_ASR_COMPUTE_TYPE,
             download_root=_ASR_DOWNLOAD_ROOT,
         )
 
@@ -97,7 +100,7 @@ def run_asr(audio: np.ndarray, sample_rate: int) -> str:
         audio = audio.mean(axis=1)
     audio = audio.astype(np.float32)
 
-    segments, _info = _ASR_MODEL.transcribe(audio, language="en")
+    segments, _info = _ASR_MODEL.transcribe(audio)
     return " ".join(segment.text for segment in segments)
 
 
@@ -116,9 +119,21 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--use-ocr", action="store_true", help="Enable OCR text keywords.")
     parser.add_argument("--device", type=str, default="cpu", help="torch device for CLIP.")
     parser.add_argument(
+        "--asr-device",
+        type=str,
+        default="auto",
+        help="ASR device: auto, cpu, or cuda.",
+    )
+    parser.add_argument(
+        "--asr-compute-type",
+        type=str,
+        default="auto",
+        help="ASR compute type: auto, int8, float16, or float32.",
+    )
+    parser.add_argument(
         "--model-cache-dir",
         type=str,
-        default=None,
+        default="model_cache",
         help="Directory to store downloaded model caches (CLIP/ASR).",
     )
     return parser.parse_args()
@@ -128,19 +143,49 @@ def _apply_model_cache_dir(cache_dir: str | None) -> None:
     if not cache_dir:
         return
 
-    os.makedirs(cache_dir, exist_ok=True)
-    os.environ["TORCH_HOME"] = cache_dir
-    os.environ["HF_HOME"] = cache_dir
-    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_dir
-    os.environ["TRANSFORMERS_CACHE"] = cache_dir
+    cache_path = Path(cache_dir).expanduser().resolve()
+    os.makedirs(cache_path, exist_ok=True)
+    cache_value = str(cache_path)
+    os.environ["TORCH_HOME"] = cache_value
+    os.environ["HF_HOME"] = cache_value
+    os.environ["HUGGINGFACE_HUB_CACHE"] = cache_value
+    os.environ["TRANSFORMERS_CACHE"] = cache_value
 
+
+def set_asr_runtime(device: str, compute_type: str) -> None:
+    global _ASR_DEVICE
+    global _ASR_COMPUTE_TYPE
+    _ASR_DEVICE = device
+    _ASR_COMPUTE_TYPE = compute_type
+
+def _resolve_asr_runtime(device: str, compute_type: str) -> tuple[str, str]:
+    resolved_device = device
+    if device == "auto":
+        try:
+            import torch
+
+            resolved_device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            resolved_device = "cpu"
+
+    resolved_compute = compute_type
+    if compute_type == "auto":
+        resolved_compute = "float16" if resolved_device == "cuda" else "int8"
+
+    return resolved_device, resolved_compute
 
 def main() -> None:
     args = _parse_args()
 
     _apply_model_cache_dir(args.model_cache_dir)
     global _ASR_DOWNLOAD_ROOT
+    global _ASR_DEVICE
+    global _ASR_COMPUTE_TYPE
     _ASR_DOWNLOAD_ROOT = args.model_cache_dir
+    _ASR_DEVICE, _ASR_COMPUTE_TYPE = _resolve_asr_runtime(
+        args.asr_device, args.asr_compute_type
+    )
+    
     session_dir = Path(args.session_dir)
     manifest_path = session_dir / "manifest.csv"
     if not manifest_path.exists():
