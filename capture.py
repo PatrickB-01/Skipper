@@ -62,6 +62,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--sample-rate", type=int, default=16000, help="Audio sample rate.")
     parser.add_argument("--channels", type=int, default=1, help="Audio channels.")
     parser.add_argument("--monitor", type=int, default=1, help="Monitor index for screen capture.")
+    parser.add_argument(
+        "--jpeg-quality",
+        type=int,
+        default=80,
+        help="JPEG quality for saved frames (1-95).",
+    )
     parser.add_argument("--device", type=str, default=None, help="Sounddevice input device name or index.")
     parser.add_argument(
         "--audio-backend",
@@ -199,6 +205,8 @@ def main() -> None:
     args = _parse_args()
     if args.window_seconds <= 0 or args.hop_seconds <= 0:
         raise ValueError("--window-seconds and --hop-seconds must be > 0.")
+    if not 1 <= args.jpeg_quality <= 95:
+        raise ValueError("--jpeg-quality must be between 1 and 95.")
 
     session_dir = Path(args.session_dir)
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -278,7 +286,7 @@ def main() -> None:
                         frame = sct.grab(monitor)
                         image = Image.frombytes("RGB", frame.size, frame.rgb)
                         frame_path = str(frames_dir / f"frame_{window_id:06d}.jpg")
-                        image.save(frame_path, "JPEG", quality=85)
+                        image.save(frame_path, "JPEG", quality=args.jpeg_quality)
 
                     if not args.no_audio:
                         audio = audio_buffer.get_last(window_samples) if audio_buffer else None
