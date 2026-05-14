@@ -79,6 +79,20 @@ Remove `--dry-run` to enable actual skipping.
 - If you want to avoid CLIP embeddings, omit `--use-clip` (features will be audio + text only).
 - For talk-heavy or idle segments, label them consistently to avoid confusing the model.
 
+## Listen to Captured Audio
+
+Play a saved `.npy` audio window:
+
+```bash
+python play_audio.py --path data/session_001/audio/audio_000005.npy --sample-rate 16000
+```
+
+Select an output device by name (or index):
+
+```bash
+python play_audio.py --path data/session_001/audio/audio_000005.npy --sample-rate 16000 --device "Headphones"
+```
+
 ## Dependencies
 
 Install Python packages:
