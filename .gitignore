@@ -222,3 +222,5 @@ __marimo__/
 # extra
 /data
 /model_cache
+*.joblib
+*.json
