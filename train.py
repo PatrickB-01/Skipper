@@ -20,15 +20,20 @@ def _parse_args() -> argparse.Namespace:
         "--features",
         type=str,
         nargs="+",
-        required=True,
+        default=None,
         help="One or more features CSV paths.",
     )
     parser.add_argument(
         "--labels",
         type=str,
         nargs="+",
-        required=True,
+        default=None,
         help="One or more labels CSV paths (same count/order as --features).",
+    )
+    parser.add_argument(
+        "--use-data-folder",
+        action="store_true",
+        help="Use all sessions under ./data (features.csv + labels.csv required).",
     )
     parser.add_argument(
         "--positive-labels",
@@ -75,6 +80,28 @@ def _load_session_start(features_path: Path) -> float | None:
 
 def main() -> None:
     args = _parse_args()
+    if args.use_data_folder:
+        data_dir = Path("data")
+        if not data_dir.exists():
+            raise FileNotFoundError("data folder not found.")
+        features_paths: list[str] = []
+        labels_paths: list[str] = []
+        for session_dir in sorted(data_dir.iterdir()):
+            if not session_dir.is_dir():
+                continue
+            features_path = session_dir / "features.csv"
+            labels_path = session_dir / "labels.csv"
+            if features_path.exists() and labels_path.exists():
+                features_paths.append(str(features_path))
+                labels_paths.append(str(labels_path))
+        if not features_paths:
+            raise FileNotFoundError("No sessions with features.csv and labels.csv found under data.")
+        args.features = features_paths
+        args.labels = labels_paths
+
+    if not args.features or not args.labels:
+        raise ValueError("Provide --features and --labels, or use --use-data-folder.")
+
     if len(args.features) != len(args.labels):
         raise ValueError("--features and --labels must have the same number of paths.")
 

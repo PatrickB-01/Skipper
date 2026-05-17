@@ -44,6 +44,12 @@ Train across multiple sessions (same feature pipeline):
 python train.py --features data/session_001/features.csv data/session_002/features.csv --labels data/session_001/labels.csv data/session_002/labels.csv --model-out model.joblib --feature-out features.json
 ```
 
+Train using all sessions in `data/` (must contain features.csv + labels.csv):
+
+```bash
+python train.py --use-data-folder --model-out model.joblib --feature-out features.json
+```
+
 5) Run real-time inference (dry run first)
 
 ```bash
@@ -74,6 +80,7 @@ Remove `--dry-run` to enable actual skipping.
 
 - `capture.py` args: `--audio-backend` (soundcard/sounddevice), `--loopback` (WASAPI), `--device` (audio device name/index), `--jpeg-quality` (frame size), `--no-audio`/`--no-video` (disable streams).
 - `features.py` args: `--use-clip`/`--use-asr`/`--use-ocr` (feature toggles), `--device` (CLIP torch device), `--asr-device` + `--asr-compute-type` (ASR runtime), `--model-cache-dir` (model cache).
+- `train.py` args: `--features`/`--labels` (explicit session inputs), `--use-data-folder` (auto-use data/*), `--positive-labels` (skip classes), `--error-report` (false positives/negatives CSV).
 - `infer.py` args: `--threshold` (skip probability), `--debounce` (consecutive hits), `--window-seconds`/`--hop-seconds` (analysis cadence), `--dry-run` (no keypress), `--asr-mode` (subprocess/inprocess), `--asr-timeout` (skip slow ASR), `--asr-echo` (print transcripts), `--ignore-skip-errors` (log keypress failures), `--model-cache-dir` (model cache).
 - Use `--audio-backend soundcard` for system audio capture on Windows. Use `--audio-backend sounddevice` with `--loopback` if preferred.
 - For audio device selection, pass `--device "Headphones"` (partial match).
