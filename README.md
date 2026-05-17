@@ -53,7 +53,11 @@ python infer.py --model model.joblib --features features.json --use-clip --use-a
 GPU (if available) for CLIP + ASR:
 
 ```bash
-python infer.py --model model.joblib --features features.json --use-clip --use-asr --use-ocr --audio-backend soundcard --device cuda --asr-device auto --asr-compute-type auto
+python infer.py --model model.joblib --features features.json --use-clip --use-asr --use-ocr --audio-backend soundcard --torch-device cuda --asr-device auto --asr-compute-type auto
+```
+
+```bash
+python infer.py --model model.joblib --features features.json --use-clip --use-asr --use-ocr --audio-backend soundcard --asr-device cpu --asr-compute-type int8 --dry-run --asr-echo
 ```
 
 Remove `--dry-run` to enable actual skipping.
@@ -68,13 +72,12 @@ Remove `--dry-run` to enable actual skipping.
 
 ## Notes and Options
 
-- Use `--audio-backend soundcard` for system audio capture on Windows.
-- If you prefer `sounddevice`, use `--audio-backend sounddevice` with `--loopback`.
+- `capture.py` args: `--audio-backend` (soundcard/sounddevice), `--loopback` (WASAPI), `--device` (audio device name/index), `--jpeg-quality` (frame size), `--no-audio`/`--no-video` (disable streams).
+- `features.py` args: `--use-clip`/`--use-asr`/`--use-ocr` (feature toggles), `--device` (CLIP torch device), `--asr-device` + `--asr-compute-type` (ASR runtime), `--model-cache-dir` (model cache).
+- `infer.py` args: `--threshold` (skip probability), `--debounce` (consecutive hits), `--window-seconds`/`--hop-seconds` (analysis cadence), `--dry-run` (no keypress), `--asr-mode` (subprocess/inprocess), `--asr-timeout` (skip slow ASR), `--asr-echo` (print transcripts), `--ignore-skip-errors` (log keypress failures), `--model-cache-dir` (model cache).
+- Use `--audio-backend soundcard` for system audio capture on Windows. Use `--audio-backend sounddevice` with `--loopback` if preferred.
+- For audio device selection, pass `--device "Headphones"` (partial match).
 - If ASR or OCR are not installed, skip `--use-asr` or `--use-ocr`.
-- You can pass `--device "Headphones"` (partial match) to pick a specific output.
-- Use `--jpeg-quality` to control frame size (default: 80).
-- Model caches default to `./model_cache`. Use `--model-cache-dir` to override.
-- For ASR GPU control, use `--asr-device` (auto/cpu/cuda) and `--asr-compute-type` (auto/int8/float16/float32).
 - RandomForest models are retrained from scratch when you add new sessions.
 - If you want to avoid CLIP embeddings, omit `--use-clip` (features will be audio + text only).
 - For talk-heavy or idle segments, label them consistently to avoid confusing the model.

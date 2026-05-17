@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+from ctypes import wintypes
 import time
 import winsound
 
@@ -15,6 +16,11 @@ import winsound
 INPUT_KEYBOARD = 1
 KEYEVENTF_KEYUP = 0x0002
 VK_RIGHT = 0x27
+ULONG_PTR = getattr(
+	wintypes,
+	"ULONG_PTR",
+	ctypes.c_uint64 if ctypes.sizeof(ctypes.c_void_p) == 8 else ctypes.c_uint32,
+)
 
 
 # Common virtual-key names for --toggle-key.
@@ -58,12 +64,31 @@ class KEYBDINPUT(ctypes.Structure):
 		("wScan", ctypes.c_ushort),
 		("dwFlags", ctypes.c_ulong),
 		("time", ctypes.c_ulong),
-		("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+		("dwExtraInfo", ULONG_PTR),
+	]
+
+
+class MOUSEINPUT(ctypes.Structure):
+	_fields_ = [
+		("dx", wintypes.LONG),
+		("dy", wintypes.LONG),
+		("mouseData", wintypes.DWORD),
+		("dwFlags", wintypes.DWORD),
+		("time", wintypes.DWORD),
+		("dwExtraInfo", ULONG_PTR),
+	]
+
+
+class HARDWAREINPUT(ctypes.Structure):
+	_fields_ = [
+		("uMsg", wintypes.DWORD),
+		("wParamL", wintypes.WORD),
+		("wParamH", wintypes.WORD),
 	]
 
 
 class INPUTUNION(ctypes.Union):
-	_fields_ = [("ki", KEYBDINPUT)]
+	_fields_ = [("mi", MOUSEINPUT), ("ki", KEYBDINPUT), ("hi", HARDWAREINPUT)]
 
 
 class INPUT(ctypes.Structure):
@@ -72,7 +97,8 @@ class INPUT(ctypes.Structure):
 
 def send_right_arrow() -> None:
 	"""Send a Right Arrow key down + up event using Win32 SendInput."""
-	extra = ctypes.c_ulong(0)
+	extra = ULONG_PTR(0)
+	user32 = ctypes.WinDLL("user32", use_last_error=True)
 
 	key_down = INPUT(
 		type=INPUT_KEYBOARD,
@@ -82,7 +108,7 @@ def send_right_arrow() -> None:
 				wScan=0,
 				dwFlags=0,
 				time=0,
-				dwExtraInfo=ctypes.pointer(extra),
+				dwExtraInfo=extra,
 			)
 		),
 	)
@@ -95,15 +121,18 @@ def send_right_arrow() -> None:
 				wScan=0,
 				dwFlags=KEYEVENTF_KEYUP,
 				time=0,
-				dwExtraInfo=ctypes.pointer(extra),
+				dwExtraInfo=extra,
 			)
 		),
 	)
 
 	inputs = (INPUT * 2)(key_down, key_up)
-	sent = ctypes.windll.user32.SendInput(2, ctypes.byref(inputs), ctypes.sizeof(INPUT))
+	user32.SendInput.argtypes = (wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int)
+	user32.SendInput.restype = wintypes.UINT
+	sent = user32.SendInput(2, inputs, ctypes.sizeof(INPUT))
 	if sent != 2:
-		raise OSError("SendInput failed to send Right Arrow key events.")
+		error = ctypes.get_last_error()
+		raise OSError(f"SendInput failed to send Right Arrow key events. GetLastError={error}")
 
 
 def _parse_toggle_vk(key_text: str) -> int:
@@ -194,6 +223,7 @@ def main() -> None:
 		was_toggle_down = toggle_down
 
 		if not paused and now >= next_skip_time:
+			time.sleep(5)
 			send_right_arrow()
 			next_skip_time = now + args.seconds
 
